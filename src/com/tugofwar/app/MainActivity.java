@@ -2,39 +2,34 @@ package com.tugofwar.app;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
-import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 
@@ -43,6 +38,11 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
   private Button startButton;
   private Button joinButton;
   private EditText nameET;
+  private View flash;
+  private ProgressDialog progressDialog;
+  private TextView winLose;
+
+  private boolean isFirstPlayer = false;
 
   private SensorManager mSensorManager;
   private Sensor mAccelerometer;
@@ -50,7 +50,6 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
   public static final int BUFFER_SIZE = 2048;
   private Socket socket = null;
   private PrintWriter out = null;
-  private BufferedReader in = null;
   private static final int SERVERPORT = 23316;
   private static final String SERVER_IP = "54.213.16.116";
 
@@ -100,6 +99,10 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
     joinButton.setOnClickListener(this);
 
     nameET = (EditText) findViewById(R.id.etName);
+
+    flash = (View) findViewById(R.id.flash_screen);
+
+    winLose = (TextView) findViewById(R.id.winLose);
   }
 
   @Override
@@ -113,8 +116,8 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
     } else if (v.getId() == R.id.button_join) {
       System.out.println("joining game");
       String name = nameET.getText().toString();
-      join(name);
 
+      join(name);
       findViewById(R.id.join_layout).setVisibility(View.GONE);
     }
   }
@@ -196,114 +199,88 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
   class ClientThread implements Runnable {
     @Override
     public void run() {
-      PrintWriter out = null;
-      InputStream is = null;
-      OutputStream os = null;
-      ByteBuffer buf = ByteBuffer.allocate(1024);
+      try {
+        InetAddress serverAddr = InetAddress.getByName(SERVER_IP);
+        socket = new Socket(serverAddr, SERVERPORT);
+        InputStreamReader inputStream = new InputStreamReader(socket.getInputStream());
+        BufferedReader input = new BufferedReader(inputStream);
 
-      int beat = 0;
-      while (true) {
-        //if socket not created - create it
-        //if socket not connected - connect it
-        if (socket == null || !socket.isConnected()) {
-          try {
-            System.out.println("starting socket");
-            InetAddress serverAddr = InetAddress.getByName(SERVER_IP);
-            socket = new Socket(serverAddr, SERVERPORT);
-            is = socket.getInputStream(); //open socket streams
-            os = socket.getOutputStream();
-            out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
-          } catch (IOException e) {
-            System.out.println("Can't open socket streams - IOException");
-            break;
-          }
-          //System.out.println("Socket connected");
+        while (true) {
+          final String message = input.readLine();
+          System.out.println(message);
+          handleMessage(message);
+
         }
-
-        while (socket.isConnected()) {
-          //send heart beats to socket to check connection
-          //System.out.println("socket connected");
-//
-//          try {
-//            String str = "{\"action\":" + ACTION_TUG + "}";
-//            out.println(str);
-//          } catch (Exception e) {
-//            e.printStackTrace();
-//            System.out.println("Can't send tug");
-//            socket = null;
-//            break;
-//          }
-
-          ByteArrayOutputStream output = new ByteArrayOutputStream();
-
-          //read from socket
-          try {
-            if (is.available() > 0 && buf.remaining() > 0) {
-              System.out.println("start " + buf.position());
-
-//              while (is.available() > 0 && buf.remaining() > 0){
-//                buf.put((byte) is.read());
-//              }
-              int read = 0;
-              byte[] buffer = new byte[1024];
-              while (is.available() > 0 && buf.remaining() > 0 && read != -1) {
-                read = is.read();
-
-                if (read != -1){
-                  System.out.println("reading "+ read);
-                  output.write(buffer,0,read);
-                }else {
-                  System.out.println("found -1");
-                  break;
-                }
-
-              }
-              System.out.println("end loading byte buffer");
-              output.close();
-            } else if (buf.position() > 0) {
-              System.out.println("later " + buf.position());
-              ByteBuffer cleanBuffer = ByteBuffer.wrap(buf.array());
-
-              String v = new String(output.toByteArray(), Charset.forName("UTF-8") );
-              System.out.println("input stream: " + v);
-              buf.clear();
-            } else
-              buf.clear();
-          } catch (IOException e) {
-            System.out.println("Can't read from socket - IOException");
-            e.printStackTrace();
-          }
-        }
+      } catch (Exception e) {
+        e.printStackTrace();
       }
     }
-//    @Override
-//    public void run() {
-//      try {
-//        System.out.println("starting socket");
-//        InetAddress serverAddr = InetAddress.getByName(SERVER_IP);
-//        socket = new Socket(serverAddr, SERVERPORT);
-//        out = new PrintWriter(socket.getOutputStream());
-//        //in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-//        System.out.println("socket initialized");
-//
-////        ClientTask task = new ClientTask();
-////        task.execute(socket);
-//      } catch (UnknownHostException e1) {
-//        e1.printStackTrace();
-//      } catch (IOException e1) {
-//        e1.printStackTrace();
-//      }
-////      while(true){
-////        receiveDataFromServer();
-////      }
-//    }
   }
 
-  private void disConnectWithServer() {
+  private void handleMessage(String message) {
+    JSONObject parser;
+    try {
+      parser = new JSONObject(message);
+      System.out.println("response: "+parser.getInt("action"));
+      switch (parser.getInt("action")){
+        case RESPONSE_JOIN:{
+          handleJoin(parser.getString("opponent_name"));
+          break;
+        }
+        case RESPONSE_WAITING:{
+          handleWaiting();
+          break;
+        }
+        case RESPONSE_DISCONNECT:{
+          handleDisconnect();
+          break;
+        }
+        case RESPONSE_TUG:{
+          handleScoreUpdate(parser.getInt("score"));
+          break;
+        }
+        case RESPONSE_WIN:{
+          handleEndGame(true);
+          break;
+        }
+        case RESPONSE_LOSE: {
+          handleEndGame(false);
+          break;
+        }
+      }
+    } catch (JSONException e) {
+
+    }
+  }
+
+  private void handleJoin(final String name) {
+    System.out.println("Connected with player: " + name);
+    if(progressDialog != null && progressDialog.isShowing())
+      progressDialog.dismiss();
+    runOnUiThread(new Runnable() {
+      public void run() {
+        Toast.makeText(MainActivity.this, "Connected with player: " + name, Toast.LENGTH_SHORT).show();
+      }
+    });
+
+  }
+
+  private void handleWaiting(){
+    System.out.println("Waiting...");
+    runOnUiThread(new Runnable() {
+      public void run() {
+        showProgress("Looking for player...");
+      }
+    });
+    isFirstPlayer = true;
+  }
+
+  public void handleDisconnect()
+  {
+    System.out.println("Disconnected...");
     if (socket != null) {
       if (socket.isConnected()) {
         try {
-          in.close();
           out.close();
           socket.close();
         } catch (IOException e) {
@@ -311,16 +288,63 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
         }
       }
     }
+    // TODO: Reset activity
+  }
+
+  public void handleScoreUpdate(int score) {
+    System.out.println("Score: " + score);
+    if ((score >= 0 && isFirstPlayer) || (score < 0 && !isFirstPlayer)) {
+      runOnUiThread(new Runnable() {
+        public void run() {
+          flash.setBackgroundResource(R.color.green);
+          Animation fadeOut = new AlphaAnimation(1, 0);
+          fadeOut.setFillAfter(true);
+          fadeOut.setDuration(250);
+          flash.startAnimation(fadeOut);
+        }
+      });
+
+    } else {
+      runOnUiThread(new Runnable() {
+        public void run() {
+          flash.setBackgroundResource(R.color.red_bright);
+          Animation fadeOut = new AlphaAnimation(1, 0);
+          fadeOut.setFillAfter(true);
+          fadeOut.setDuration(250);
+          flash.startAnimation(fadeOut);
+        }
+      });
+    }
+  }
+
+  public void handleEndGame(Boolean win){
+    if (win){
+      System.out.println("YOU WON!");
+      runOnUiThread(new Runnable() {
+        public void run() {
+          winLose.setText("YOU WON!!");
+          winLose.setVisibility(View.VISIBLE);
+        }
+      });
+    }else {
+      System.out.println("YOU LOST");
+      runOnUiThread(new Runnable() {
+        public void run() {
+          winLose.setText("YOU LOST!!");
+          winLose.setVisibility(View.VISIBLE);
+        }
+      });
+    }
   }
 
   public void receiveDataFromServer() {
-      String message = "";
-      int charsRead = 0;
-      char[] buffer = new char[BUFFER_SIZE];
-      while (socket.isConnected()) {
-        message += new String(buffer).substring(0, charsRead);
-        System.out.println("received message " + message);
-      }
+    String message = "";
+    int charsRead = 0;
+    char[] buffer = new char[BUFFER_SIZE];
+    while (socket.isConnected()) {
+      message += new String(buffer).substring(0, charsRead);
+      System.out.println("received message " + message);
+    }
   }
 
   public void join(String name) {
@@ -342,6 +366,7 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
 
   public void post(String str) {
     try {
+      System.out.println("posting "+str);
       PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
       out.println(str);
     } catch (UnknownHostException e) {
@@ -353,47 +378,10 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
     }
   }
 
-  class ClientTask extends AsyncTask<Socket, Void, Void> {
-    Socket socket;
-    public BufferedReader in;
-    public DataOutputStream dos;
-    public String message;
-
-    @Override
-    protected Void doInBackground(Socket... soc) {
-      System.out.println("doinbackgorund");
-      try {
-        InetAddress serverAddr = InetAddress.getByName(SERVER_IP);
-        socket = new Socket(serverAddr, SERVERPORT);
-        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        System.out.println("socket initialized in doinbackgorund");
-      } catch (Exception e) {
-        Log.i("AsyncTank class", "Socket has some trouble opening");
-      }
-      if(socket.isConnected()){
-        System.out.println("socket open");
-      }else {
-        System.out.println("socket closed");
-      }
-      while(socket.isConnected()){
-        try {
-          String message = in.readLine();
-          System.out.println(message);
-          break;
-        } catch (IOException e) {
-          System.out.println(e.getMessage());
-        }
-      }
-      return null;
-    }
-
-    @Override
-    protected void onProgressUpdate(Void... values) {
-      super.onProgressUpdate(values);
-
-    }
-
-
+  public void showProgress(final String message){
+    System.out.println("showing progress for " + message);
+    progressDialog = ProgressDialog.show(MainActivity.this, "", message);
+    progressDialog.show();
   }
 
 }
