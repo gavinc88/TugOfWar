@@ -22,6 +22,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -37,6 +38,7 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
 
   private Button startButton;
   private Button joinButton;
+  private Button homeButton;
   private EditText nameET;
   private View flash;
   private ProgressDialog progressDialog;
@@ -98,6 +100,9 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
     joinButton = (Button) findViewById(R.id.button_join);
     joinButton.setOnClickListener(this);
 
+    homeButton = (Button) findViewById(R.id.button_return_home);
+    homeButton.setOnClickListener(this);
+
     nameET = (EditText) findViewById(R.id.etName);
 
     flash = (View) findViewById(R.id.flash_screen);
@@ -119,6 +124,11 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
 
       join(name);
       findViewById(R.id.join_layout).setVisibility(View.GONE);
+    } else if (v.getId() == R.id.button_return_home){
+      System.out.println("returning home");
+      startButton.setVisibility(View.VISIBLE);
+      winLose.setVisibility(View.GONE);
+      homeButton.setVisibility(View.GONE);
     }
   }
 
@@ -194,6 +204,8 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
     pullCount++;
     System.out.println("pull detected: " + pullCount);
     pullRope();
+    MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.grunt);
+    mp.start();
   }
 
   class ClientThread implements Runnable {
@@ -324,6 +336,9 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
         public void run() {
           winLose.setText("YOU WON!!");
           winLose.setVisibility(View.VISIBLE);
+          homeButton.setVisibility(View.VISIBLE);
+          MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.victory);
+          mp.start();
         }
       });
     }else {
@@ -332,6 +347,7 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
         public void run() {
           winLose.setText("YOU LOST!!");
           winLose.setVisibility(View.VISIBLE);
+          homeButton.setVisibility(View.VISIBLE);
         }
       });
     }
