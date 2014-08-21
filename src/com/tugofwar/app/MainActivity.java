@@ -113,22 +113,27 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
   @Override
   public void onClick(View v) {
     if (v.getId() == R.id.button_start) {
+
       System.out.println("starting game");
       new Thread(new ClientThread()).start();
-
       startButton.setVisibility(View.GONE);
       findViewById(R.id.join_layout).setVisibility(View.VISIBLE);
+
     } else if (v.getId() == R.id.button_join) {
+
       System.out.println("joining game");
       String name = nameET.getText().toString();
-
       join(name);
       findViewById(R.id.join_layout).setVisibility(View.GONE);
+
     } else if (v.getId() == R.id.button_return_home){
+
       System.out.println("returning home");
       startButton.setVisibility(View.VISIBLE);
       winLose.setVisibility(View.GONE);
       homeButton.setVisibility(View.GONE);
+      isFirstPlayer = false;
+
     }
   }
 
@@ -218,7 +223,7 @@ public class MainActivity extends Activity implements OnClickListener, SensorEve
         BufferedReader input = new BufferedReader(inputStream);
 
         while (true) {
-          final String message = input.readLine();
+          String message = input.readLine();
           System.out.println(message);
           handleMessage(message);
 
